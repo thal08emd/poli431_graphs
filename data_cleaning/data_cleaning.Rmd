@@ -1,0 +1,370 @@
+---
+title: "data_cleaning"
+author: "Thalie Emond"
+date: "04/02/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE, warning=FALSE, results='hide'}
+knitr::opts_chunk$set(echo = TRUE, warning = F, echo = F)
+#install.packages(c("dplyr", "ggplot2", "tidyverse", "psych", "haven", "maptools", "doBy", "gganimate", "gpclib", "readxl", "gapminder", "transformr", "gifski", "viridisLite", "viridis", "plotly", "plyr", "kableExtra", "readr", "scales", "tweenr", "countrycode", "sf", "giscoR", "magick", "foreign"))
+
+library(dplyr)
+library(ggplot2)
+library(tidyverse)
+library(psych)
+library(haven)
+library(maptools)
+library(doBy)
+library(gganimate)
+library(gpclib)
+gpclibPermit()
+library(readxl)
+library(transformr)
+library(gifski)
+#remotes::install_github("mccormackandrew/mapcan")
+#library(mapcan)
+library(viridisLite)
+library(viridis)
+library(plotly)
+#library(plyr)
+library(kableExtra)
+library(readr)
+library(scales)
+library(tweenr)
+library(countrycode)
+library(sf)
+library(giscoR)
+library(magick)
+library(foreign)
+library(likert)
+```
+
+# Looking at Xenophobic attitudes in Europe (ethnicity, religion, LGBTQ, immigrants)
+
+## Hate Crime
+
+### EUROSTATS
+```{r EUROSTATS}
+
+# Hate Crime Incidents
+
+
+HC16 <- read_excel("HateCrime2016.xlsx")
+HC17 <- read_excel("HateCrime2017.xlsx")
+HC18 <- read_excel("HateCrime2018.xlsx")
+HC19 <- read_excel("HateCrime2019.xlsx")
+HC20 <- read_excel("HateCrime2020.xlsx")
+
+
+#### merge
+HC.df <- bind_rows(HC16, HC17, HC18, HC19, HC20)
+#n_distinct(unique(HC.df$Country))
+
+  
+#### Rename + Remove Outliers (USA)
+
+HC.df <- HC.df %>%
+  rename(incident_type = `Type of incident`, bias_mot = `Bias motivations`)
+
+HC.df$Country[HC.df$Country == "Russian Federation"] <- "Russia"
+
+## Subsets
+
+EUR_HC.df <- HC.df %>%
+  filter(Country != "United States of America" & Country != "Canada" & Country != "Kazakhstan" & Country != "Kyrgyzstan" & Country != "Tajikistan" & Country != "Turkmenistan" & Country != "Uzbekistan")
+
+BNA_HC.df <- HC.df %>%
+  filter(Country == "United States of America" & Country == "Canada")
+
+FUSSR_HC.df <- HC.df %>%
+  filter(Country == "Moldova" & Country == "Estonia" & Country == "Latvia" &
+         Country == "Lithuania" & Country == "Kazakhstan" & Country == "Kyrgyzstan" &
+         Country == "Tajikistan" & Country == "Turkmenistan" & Country == "Uzbekistan"&
+         Country == "Russia" & Country == "Armenia" & Country == "Azerbaijan"&
+         Country == "Georgia" & Country == "Ukraine")
+
+## EUROSTATS Demo data cleaning
+
+HC_MAP.df <- HC.df %>%
+  select(Year, Country, country_code, incident_type,bias_mot) %>%
+  group_by(Year, incident_type, country_code, bias_mot) %>%
+  count(Country) %>%
+  rename(num_incidents = n)
+
+## Population - Eurostats
+
+demo <- read.csv("demo_migration.csv")
+demo <- demo %>% 
+  select(TIME_PERIOD, geo, OBS_VALUE) %>%
+  rename(Year = TIME_PERIOD, demo = OBS_VALUE)
+  
+popu <- read.csv("entirepopu.csv")
+popu <- popu %>% 
+  select(TIME_PERIOD, geo, OBS_VALUE) %>%
+  rename(Year = TIME_PERIOD, popu = OBS_VALUE)
+
+fbpopu <- read.csv("foreignbornpopu.csv")
+fbpopu <- fbpopu %>% 
+  select(TIME_PERIOD, geo, OBS_VALUE) %>%
+  rename(Year = TIME_PERIOD, fbpopu = OBS_VALUE)
+
+### merging demo and country codes data sets
+iso2EURMAP <- gisco_countrycode %>%
+  select(iso2c, CNTR_CODE)
+
+EUR_pop.df <- left_join(x = demo, y = popu, by = c("geo", "Year"))
+EUR_pop.df <- left_join(x = EUR_pop.df, y = fbpopu, by = c("geo", "Year"))
+EUR_pop.df <- left_join(x = EUR_pop.df, y = iso2EURMAP, by = c("geo" = "iso2c"))
+
+hc_map2 <- left_join(x = EUR_pop.df, y = HC_MAP.df,
+                     by = c("CNTR_CODE"="country_code", 
+                            "Year"))
+
+## Get percentage of attacks out of immigrant population 
+
+hc_map2 <- hc_map2 %>%
+  mutate(immigrant_prop = (fbpopu / popu)* 100, popu_thsnds = popu / 100000) 
+
+hc_map2 <- hc_map2 %>%
+  filter(!is.na(Country))
+
+hc_map2 <- hc_map2 %>%
+  mutate(HC_ratio = num_incidents / popu_thsnds)
+
+###### Cleaning NAs from initial dataset
+hc_map3 <- hc_map2 %>%
+  filter(!is.na(HC_ratio))
+
+## load map from eurostate geodata (2021)
+cntries <- gisco_get_countries(year = 2020,
+                               resolution = 20) %>%
+           st_transform(3035) 
+
+cntries$NAME_ENGL[cntries$NAME_ENGL == "Russian Federation"] <- "Russia"
+cntries$NAME_ENGL[cntries$NAME_ENGL == "Czechia"] <- "Czech Republic"
+cntries$NAME_ENGL[cntries$NAME_ENGL == "United States"] <- "United States of America"
+
+
+hc_map5 <- cntries %>%
+  left_join(hc_map3, by = c("NAME_ENGL" = "Country"))
+
+## final map without data on UK
+
+hc_map5 <- hc_map5 %>%
+  filter(NAME_ENGL != "United States of America" & NAME_ENGL != "Canada" &
+           NAME_ENGL != "Kazakhstan" & NAME_ENGL != "Kyrgyzstan" & 
+           NAME_ENGL != "Tajikistan" & NAME_ENGL != "Turkmenistan" & 
+           NAME_ENGL != "Uzbekistan")
+
+```
+
+Somewhat unreliable data because people don't report it enough and not all police departments are equipped to collect that kind of data.
+- Lots of missing data
+- Unrepresentative of regional trends
+- France doesn't collect ethnic data smh
+- UK left so no data on that there
+
+### England and Wales
+```{r UK}
+
+## Get country codes and police dep areas
+
+UKmap <- gisco_get_nuts(year = "2021",
+               nuts_level = "2",
+               country = "United Kingdom",
+               resolution = 20)
+uk_HC <- read_xlsx("uk_hatecrime.xlsx", sheet = "Table 1", range = "B7:L51")
+
+uk_HC <- uk_HC %>%
+  rename(area = `Police Force Area`) %>%
+  filter(area != "Englandd")
+
+uk_HC$`2019/20 b,c` <- as.numeric(uk_HC$`2019/20 b,c`)
+
+sapply(uk_HC[,3:10], as.numeric)
+
+uk_HC <- uk_HC %>%
+  select(!`2011/12` & 
+           !`2012/13` & 
+           !`2013/14` & 
+           !`2014/15` & 
+           !`2020/21`) %>%
+  rename(`2020` = `2019/20 b,c`,
+         `2019` = `2018/19`,
+         `2018` = `2017/18`,
+         `2017` = `2016/17`,
+         `2016` = `2015/16`)
+
+uk_HC2 <- pivot_longer(data = uk_HC, cols = 2:6, names_to = "Year")
+uk_HC2$Year <- as.numeric(uk_HC2$Year)
+
+
+## get UK demographic data
+ukpopu2016 <- read_xls("ukpopu2016.xls", sheet = "1.1", range = "B9:H13")
+ukpopu2017 <- read_xls("ukpopu2017.xls", sheet = "1.1", range = "B9:H13")
+ukpopu2018 <- read_xls("ukpopu2018.xls", sheet = "1.1", range = "B9:H13")
+ukpopu2019 <- read_xls("ukpopu2019.xls", sheet = "1.1", range = "B9:H12")
+ukpopu2020 <- read_xls("ukpopu2020.xls", sheet = "1.1", range = "B4:H6")
+
+ukpopu <- data.frame(
+  popu = c(ukpopu2016[4,2], ukpopu2017[4,2], ukpopu2018[4,2], ukpopu2019[3,2], ukpopu2020[2,3]))
+
+ukfbpopu <- data.frame(
+  fbpopu = c(ukpopu2016[4,7], ukpopu2017[4,7], ukpopu2018[4,7], ukpopu2019[3,7], ukpopu2020[2,7]))
+
+colnames(ukpopu) <- c(2016, 2017, 2018, 2019, 2020)
+colnames(ukfbpopu) <- c(2016, 2017, 2018, 2019, 2020)
+
+  
+ukpopu <- pivot_longer(data = ukpopu, cols = 1:5, names_to = "Year", names_repair = "minimal")
+
+ukfbpopu <- pivot_longer(data = ukfbpopu, cols = 1:5, names_to = "Year", names_repair = "minimal")
+
+ukpopu <- left_join(ukpopu, ukfbpopu, by = "Year")
+
+ukpopu <- ukpopu %>%
+  rename(popu = value.x, fbpopu = value.y)
+
+ukpopu[5,2] <- ukpopu[5,2] / 1000
+ukpopu[5,3] <- ukpopu[5,3] / 1000
+
+ukpopu$Year <- as.numeric(ukpopu$Year)
+
+### Combine geo and demo data 
+
+
+UK_cc <- data.frame(CNTR_CODE = c("UK", "UK", "UK", "UK", "UK"))
+
+uk_HC_clean <- cbind(UK_cc, uk_HC2)
+
+uk_HC_clean <- uk_HC_clean %>%
+  left_join(ukpopu, by = "Year")
+
+ukgeom <- data.frame(geometry = c(hc_map5[4024,18], hc_map5[4024,18],hc_map5[4024,18],hc_map5[4024,18],hc_map5[4024,18]))
+
+ukgeom <- pivot_longer(ukgeom, cols = 1:5, names_to = "geometry", names_repair = "minimal")
+
+uk_HC_clean <- cbind(uk_HC_clean, ukgeom[,2])
+
+
+### Get percentage and stuff 
+
+uk_HC_clean <- uk_HC_clean %>%
+  mutate(immigrant_prop = (fbpopu / popu)* 100, HC_ratio = num_incidents / popu) 
+
+```
+
+May be unreliable
+- Police force area is incompatible with Eurostats' geodata (NUTS3)
+- Have to add up all areas for nationwide data
+
+### Final data set on hate crime reports
+```{r merging}
+hc_map6 <- hc_map5 %>%
+  full_join(uk_HC_clean, by = c("CNTR_ID" = "CNTR_CODE", "Year", "num_incidents", "popu", "fbpopu", "geometry" = "value", "HC_ratio", "immigrant_prop"))
+
+#save(hc_map6, file = "hc_map6.RData")
+
+load("hc_map6.RData")
+
+```
+
+Not a reliable measurement for xenophobic attitudes.
+
+## Eurostats data on nationalism and views on immigrants 
+```{r GESIS}
+
+#devtools::install_github("expersso/gesis")
+
+EVS <- read.spss("ZA7503_v2-0-0.sav", to.data.frame=TRUE)
+
+EVS$S020 <- as.numeric(levels(EVS$S020))[EVS$S020]
+
+EVS1 <- EVS %>%
+  filter(S020 > 2015) %>%
+  summarise(S003, S009, pwght, S020, X025, G006, G007_35_B, G007_36_B, G033, G036, G038, G040, G041, G043, G052, G257)
+
+#EVS1[,1:16] <- sapply(EVS1[,1:16],as.numeric)
+#sapply(EVS1[,1:16], class)
+
+EVS1 <- EVS1 %>%
+  rename(iso3 = S003, 
+         iso3_2 = S009, 
+         pwght = pwght, 
+         Year = S020, 
+         educ_level = X025, 
+         national_pride = G006, 
+         trust_oth_religion = G007_35_B, 
+         trust_oth_nationality = G007_36_B, 
+         imptce_birthplace = G033, 
+         imptce_speaklang = G036, 
+         imt_takeaway_jobs = G038, 
+         imt_incr_probs = G040, 
+         imt_welfare = G041, 
+         imt_customs = G043, 
+         imt_impactdev = G052, 
+         close_country = G257)
+
+#save(EVS1, file = "EVS1.RData")
+
+load("EVS1.RData")
+
+```
+
+
+```{r  recoding formulas}
+
+imt_views <- select(EVS1, 
+                    imt_takeaway_jobs,imt_incr_probs, imt_customs, imt_welfare)
+
+
+recoding_4answers <- function(X){
+  Y <- ifelse(is.na(X), NA,
+              ifelse(X == 1, "Very close",
+                     ifelse(X == 2, "Close",
+                            ifelse(X == 3, "Not very close",
+                                   ifelse(X == 4, "Not close at all", NA)))))
+  Y <- factor(Y, levels = c("Very close", "Close", "Not very close", "Not close at all"))
+  return(Y)
+}
+
+
+EVS1_imt_likert <- imt_views %>%
+  likert()
+
+Qs_imt_views <- names(imt_views)
+
+## MISSING LEVEL
+
+likert_chart1 <- plot(EVS1_imt_likert,
+     group.order=names(imt_views),
+     plot.percents = F,
+     plot.percent.low = FALSE,
+     plot.percent.high = FALSE,
+     centered = T,
+     wrap=20,
+     legend.position = "right",
+     center = 3.5) +
+  scale_fill_viridis(discrete=TRUE) +
+  theme(panel.grid = element_line(color = NA),
+        plot.title = element_text("Views on Immigrants"),
+        axis.text.y = element_text(colour = "black"))
+
+likert_chart1
+
+
+```
+
+```{r Hungary & Romania data}
+RO_HU_att <- EVS1 %>%
+  filter(iso3_2 == "RO" & iso3_2 == "HU") 
+  
+
+```
+
+```
+
+
+
+
