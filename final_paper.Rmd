@@ -1,0 +1,61 @@
+---
+title: |
+ | \vspace{5cm} "Final Paper (CHANGE)"
+author:  "Thalie Emond"
+date: "11/12/2021"
+output: 
+  pdf_document:
+    toc: FALSE
+subtitle: | 
+ | \vspace{5cm} 'POLI-312-001: Intermediate Quantitative Political Science' 
+geometry: left=2.5cm,right=2.5cm,top=2cm,bottom=2cm
+
+---
+```{r setup, include=FALSE, results='hide'}
+knitr::opts_chunk$set(echo = TRUE, warning = F)
+#install.packages(c("haven", "psych", "tidyverse", "dyplr", "ggplot2", "png", "remotes", "viridis", "likert", "plotly", "maptools", "doBy", "gganimate", "gpclib", "readxl", "gapminder", "transformr", "stringr", "kableExtra", "scales", "magick", "stargazer", "tinytex"))
+library(haven)
+library(psych)
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(remotes)
+library(png)
+library(viridisLite)
+library(viridis)
+library(likert)
+library(plotly)
+library(maptools)
+library(doBy)
+library(gganimate)
+library(gpclib)
+gpclibPermit()
+library(readxl)
+library(stringr)
+library(kableExtra)
+library(magick)
+library(modelsummary)
+library(tinytex)
+```
+
+\newpage
+
+
+# Introduction
+
+&nbsp;&nbsp; jsp
+
+# Background
+
+## Literature Review
+
+
+\newpage
+# Reference List 
+
+\setlength{\parindent}{-0.2in}
+\setlength{\leftskip}{0.2in}
+\setlength{\parskip}{8pt}
+
+\
+\indent some source
