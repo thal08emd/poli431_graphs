@@ -1,13 +1,13 @@
 ---
 title: |
- | \vspace{5cm} "Final Paper (CHANGE)"
+ | \vspace{5cm} "Research Paper Proposal"
 author:  "Thalie Emond"
 date: "11/12/2021"
 output: 
   pdf_document:
     toc: FALSE
 subtitle: | 
- | \vspace{5cm} 'POLI-312-001: Intermediate Quantitative Political Science' 
+ | \vspace{5cm} 'POLI-524: Political Development in Europe' 
 geometry: left=2.5cm,right=2.5cm,top=2cm,bottom=2cm
 
 ---
@@ -43,7 +43,7 @@ library(tinytex)
 
 # Introduction
 
-&nbsp;&nbsp; jsp
+&nbsp;&nbsp; National identification processes in Europe are intrinsically linked with meanings attached to territorial borders and life experiences that shape worldviews.
 
 # Background
 
